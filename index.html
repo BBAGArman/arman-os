@@ -1,0 +1,1711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#1B1613">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>ArmanOS</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #1B1613;
+  --surface: #231F1C;
+  --surface-hover: #2C2724;
+  --surface-active: #352F2B;
+  --border: #3A3530;
+  --border-muted: #2E2925;
+  --text: #E7E0D5;
+  --text-muted: #9C9488;
+  --text-dim: #6B6560;
+  --accent: #B89B71;
+  --accent-dim: rgba(184,155,113,0.12);
+  --accent-faint: rgba(184,155,113,0.06);
+  --error: #A65454;
+  --success: #5A7A56;
+  --serif: 'EB Garamond', Georgia, serif;
+  --mono: 'IBM Plex Mono', 'Courier New', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --radius: 3px;
+  --tr: 150ms ease;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { height:100%; overflow:hidden; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+input, textarea, select, button { font-family: inherit; }
+input:focus, textarea:focus, select:focus { border-color: var(--accent) !important; outline: none; }
+
+/* ── Layout ── */
+#app { height: 100vh; }
+.desktop { display: grid; grid-template-columns: 220px 1fr 300px; height: 100vh; }
+.col { height: 100vh; overflow-y: auto; overflow-x: hidden; padding: 14px; border-right: 1px solid var(--border-muted); }
+.col:last-child { border-right: none; }
+
+/* ── Mobile ── */
+@media (max-width: 767px) {
+  .desktop { display: block; height: auto; }
+  .col { height: auto; border-right: none; overflow: visible; }
+  .mobile-hide { display: none !important; }
+  .mobile-tab-content { padding-bottom: 68px; }
+  .tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--surface); border-top: 1px solid var(--border);
+    display: flex; justify-content: space-around;
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+    z-index: 100;
+  }
+  .tab-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 4px 12px; font-size: 10px; font-family: var(--mono);
+    color: var(--text-dim); background: none; border: none; cursor: pointer;
+    letter-spacing: 0.04em; transition: color var(--tr);
+  }
+  .tab-btn.active { color: var(--accent); }
+  .tab-btn svg { stroke: currentColor; }
+}
+@media (min-width: 768px) {
+  .tab-bar { display: none !important; }
+}
+
+/* ── Typography ── */
+.section-label {
+  font-family: var(--serif); font-size: 10px; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--text-dim);
+  margin-bottom: 10px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.h2 { font-family: var(--serif); font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 4px; line-height: 1.3; }
+
+/* ── Cards & Tasks ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+  margin-bottom: 6px; transition: background var(--tr); cursor: pointer;
+}
+.card:hover { background: var(--surface-hover); }
+.task-row {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 10px;
+  margin-bottom: 5px; transition: all var(--tr); cursor: pointer;
+}
+.task-row:hover { background: var(--surface-hover); }
+.task-row.h1 { background: var(--accent-faint); }
+.task-row.h1:hover { background: var(--accent-dim); }
+.task-row.completing {
+  opacity: 0; transform: translateX(8px);
+  transition: all 400ms ease;
+}
+
+/* ── Badges ── */
+.badge {
+  display: inline-block; font-size: 9px; font-family: var(--mono);
+  letter-spacing: 0.06em; padding: 1px 5px; border-radius: 2px;
+  margin-right: 4px;
+}
+
+/* ── Inputs ── */
+.input {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 13px; padding: 8px 10px; width: 100%;
+  transition: border-color var(--tr);
+}
+.input::placeholder { color: var(--text-dim); }
+.textarea {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 13px; padding: 8px 10px; width: 100%;
+  resize: vertical; min-height: 80px;
+  transition: border-color var(--tr);
+}
+.textarea::placeholder { color: var(--text-dim); }
+.select {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); color: var(--text);
+  font-size: 12px; padding: 4px 8px; cursor: pointer;
+}
+
+/* ── Buttons ── */
+.btn {
+  background: var(--accent); color: var(--bg); border: none;
+  border-radius: var(--radius); padding: 6px 14px;
+  font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+  cursor: pointer; transition: opacity var(--tr);
+}
+.btn:hover { opacity: 0.9; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 5px 10px; font-size: 11px; cursor: pointer;
+  transition: all var(--tr);
+}
+.btn-ghost:hover { border-color: var(--text-dim); color: var(--text); }
+
+/* ── Energy selector ── */
+.energy-btn {
+  flex: 1; font-size: 10px; font-family: var(--mono);
+  letter-spacing: 0.06em; padding: 5px 10px;
+  background: transparent; color: var(--text-muted);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer; transition: all var(--tr);
+}
+.energy-btn.active {
+  background: var(--accent-dim); color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* ── Checkbox ── */
+.checkbox {
+  width: 16px; height: 16px; min-width: 16px;
+  border-radius: 2px; border: 1.5px solid var(--text-dim);
+  background: transparent; cursor: pointer; margin-top: 2px;
+  transition: all var(--tr); display: flex;
+  align-items: center; justify-content: center; padding: 0;
+}
+.checkbox.checked {
+  border-color: var(--accent); background: var(--accent);
+}
+
+/* ── Domain dot ── */
+.domain-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Domain nav button ── */
+.domain-btn {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 6px 8px; background: transparent;
+  border: none; border-radius: var(--radius); cursor: pointer;
+  margin-bottom: 2px; transition: background var(--tr);
+  color: var(--text); font-size: 12px; font-family: var(--sans);
+}
+.domain-btn:hover { background: var(--surface-hover); }
+.domain-btn.active { background: var(--surface-active); }
+
+/* ── Modal overlay ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 16px; animation: fadeIn 150ms ease;
+}
+.modal {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 4px; padding: 20px; width: 100%;
+  max-width: 460px; max-height: 85vh; overflow-y: auto;
+  animation: slideUp 200ms ease;
+}
+.modal-wide { max-width: 560px; }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes slideUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+
+/* ── Calendar strip ── */
+.cal-day-label {
+  font-size: 10px; font-family: var(--mono); letter-spacing: 0.06em;
+  margin-bottom: 3px; font-weight: 400; color: var(--text-dim);
+}
+.cal-day-label.today { color: var(--accent); font-weight: 500; }
+.cal-event {
+  font-size: 11px; padding: 3px 8px; margin-bottom: 2px;
+  color: var(--text);
+}
+
+/* ── Streak ── */
+.streak-bar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 8px; background: var(--accent-faint);
+  border-radius: var(--radius); margin-bottom: 14px;
+}
+
+/* ── FFAR countdown ── */
+.ffar-countdown {
+  background: var(--accent-faint); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 10px 12px;
+  margin-bottom: 12px; text-align: center;
+}
+
+/* ── Sprint button ── */
+.sprint-btn {
+  width: 100%; margin-bottom: 14px; display: flex;
+  align-items: center; gap: 6px; justify-content: center;
+  font-size: 10px; font-family: var(--mono);
+}
+.sprint-btn.active {
+  background: rgba(139,111,94,0.15); color: #8B6F5E;
+  border-color: #8B6F5E;
+}
+
+/* ── Brief panel ── */
+.brief-panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px;
+}
+.brief-line { margin-bottom: 6px; line-height: 1.5; }
+.brief-line:last-child { margin-bottom: 0; }
+.brief-greeting {
+  font-size: 14px; font-family: var(--serif); font-weight: 500;
+  color: var(--text);
+}
+.brief-item { font-size: 12px; color: var(--text-muted); }
+
+/* ── Loading spinner ── */
+.spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 1.5px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Status bar ── */
+.sync-status { margin-top: 20px; border-top: 1px solid var(--border-muted); padding-top: 10px; }
+
+/* ── Onboarding ── */
+.onboarding-overlay {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 20px;
+}
+.onboarding-card {
+  max-width: 500px; width: 100%; text-align: center;
+}
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--accent);
+  color: var(--accent); padding: 8px 20px; border-radius: var(--radius);
+  font-size: 12px; z-index: 1100; animation: fadeIn 200ms ease;
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// ArmanOS — Core Engine
+// ═══════════════════════════════════════════
+
+const APP = {
+  keys: null,
+  data: { entries: [], pinned: [], settings: {} },
+  calEvents: [],
+  syncStatus: { online: navigator.onLine, lastSync: null, fileSize: '0 KB', syncing: false, error: null },
+  streak: 0,
+  energy: 'Medium',
+  selectedDomain: null,
+  sprintMode: false,
+  searchQuery: '',
+  mobileTab: 'brief',
+  showModal: null,
+  selectedTask: null,
+  cachedBrief: null,
+  liveBrief: null,
+  briefLoading: false,
+  toastMsg: null,
+  toastTimer: null,
+  initialized: false,
+  onboarding: false,
+
+  // ── Domain config ──
+  domains: {
+    BBAG: { color: '#6B7B8D', label: 'BBAG' },
+    'Casa Lari': { color: '#A67C5B', label: 'Casa Lari' },
+    FFAR: { color: '#8B6F5E', label: 'FFAR' },
+    Ace: { color: '#7A7872', label: 'Ace' },
+    Family: { color: '#7A8C6E', label: 'Family' },
+    Creative: { color: '#C4B49A', label: 'Creative' },
+    TradNorm: { color: '#6B7355', label: 'TradNorm' },
+  },
+
+  FFAR_EXAM: '2026-04-28',
+};
+
+// ── Utilities ──
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+const isoNow = () => new Date().toISOString();
+const daysBetween = (a, b) => Math.ceil((new Date(b) - new Date(a)) / 86400000);
+const fmtDate = (d) => new Date(d).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+const fmtTime = (d) => new Date(d).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+const fmtDay = (d) => new Date(d).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }).toUpperCase();
+const timeOfDay = () => { const h = new Date().getHours(); return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'; };
+const isMobile = () => window.innerWidth < 768;
+const esc = (s) => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+function toast(msg) {
+  APP.toastMsg = msg;
+  clearTimeout(APP.toastTimer);
+  APP.toastTimer = setTimeout(() => { APP.toastMsg = null; render(); }, 2500);
+  render();
+}
+
+// ═══════════════════════════════════════════
+// IndexedDB — Offline Queue + Cache
+// ═══════════════════════════════════════════
+const IDB = {
+  _db: null,
+  async open() {
+    if (this._db) return this._db;
+    return new Promise((res, rej) => {
+      const req = indexedDB.open('ArmanOS', 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains('offlineQueue'))
+          db.createObjectStore('offlineQueue', { keyPath: 'id', autoIncrement: true });
+        if (!db.objectStoreNames.contains('cache'))
+          db.createObjectStore('cache', { keyPath: 'key' });
+      };
+      req.onsuccess = () => { this._db = req.result; res(req.result); };
+      req.onerror = () => rej(req.error);
+    });
+  },
+  async enqueue(entry) {
+    const db = await this.open();
+    const tx = db.transaction('offlineQueue', 'readwrite');
+    tx.objectStore('offlineQueue').add({ ...entry, ts: isoNow() });
+    return new Promise(r => { tx.oncomplete = r; });
+  },
+  async dequeueAll() {
+    const db = await this.open();
+    const tx = db.transaction('offlineQueue', 'readwrite');
+    const store = tx.objectStore('offlineQueue');
+    const items = await new Promise(r => { const req = store.getAll(); req.onsuccess = () => r(req.result); });
+    store.clear();
+    return items;
+  },
+  async setCache(key, value) {
+    const db = await this.open();
+    const tx = db.transaction('cache', 'readwrite');
+    tx.objectStore('cache').put({ key, value, ts: isoNow() });
+  },
+  async getCache(key) {
+    const db = await this.open();
+    const tx = db.transaction('cache', 'readonly');
+    return new Promise(r => { const req = tx.objectStore('cache').get(key); req.onsuccess = () => r(req.result?.value || null); });
+  },
+};
+
+// ═══════════════════════════════════════════
+// Dropbox API
+// ═══════════════════════════════════════════
+const Dropbox = {
+  async readFile(path) {
+    const resp = await fetch('https://content.dropboxapi.com/2/files/download', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${APP.keys.dropbox}`,
+        'Dropbox-API-Arg': JSON.stringify({ path }),
+      },
+    });
+    if (!resp.ok) throw new Error(`Dropbox read failed: ${resp.status}`);
+    const text = await resp.text();
+    APP.syncStatus.fileSize = (new Blob([text]).size / 1024).toFixed(1) + ' KB';
+    return JSON.parse(text);
+  },
+
+  async writeFile(path, data) {
+    const body = JSON.stringify(data, null, 0);
+    const size = new Blob([body]).size;
+
+    // 500KB hard cap
+    if (size > 512000) {
+      toast('Data file exceeds 500KB. Run summary compression.');
+      return false;
+    }
+
+    const resp = await fetch('https://content.dropboxapi.com/2/files/upload', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${APP.keys.dropbox}`,
+        'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true }),
+        'Content-Type': 'application/octet-stream',
+      },
+      body,
+    });
+    if (!resp.ok) throw new Error(`Dropbox write failed: ${resp.status}`);
+    APP.syncStatus.fileSize = (size / 1024).toFixed(1) + ' KB';
+    return true;
+  },
+
+  async backup() {
+    try {
+      const date = new Date().toISOString().slice(0,10);
+      const body = JSON.stringify(APP.data, null, 0);
+      await fetch('https://content.dropboxapi.com/2/files/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${APP.keys.dropbox}`,
+          'Dropbox-API-Arg': JSON.stringify({ path: `/backups/backup-${date}.json`, mode: 'overwrite', mute: true }),
+          'Content-Type': 'application/octet-stream',
+        },
+        body,
+      });
+    } catch (e) {
+      console.warn('Backup failed:', e);
+    }
+  },
+};
+
+// ═══════════════════════════════════════════
+// Sync Engine
+// ═══════════════════════════════════════════
+async function syncData() {
+  if (!APP.keys?.dropbox) return;
+  APP.syncStatus.syncing = true;
+  APP.syncStatus.error = null;
+  render();
+
+  try {
+    // Flush offline queue first
+    const queued = await IDB.dequeueAll();
+    if (queued.length > 0) {
+      // Merge queued entries
+      for (const item of queued) {
+        if (item.type === 'add_entry') {
+          APP.data.entries.push(item.entry);
+        } else if (item.type === 'update_entry') {
+          const idx = APP.data.entries.findIndex(e => e.id === item.entry.id);
+          if (idx >= 0) APP.data.entries[idx] = item.entry;
+        } else if (item.type === 'delete_entry') {
+          APP.data.entries = APP.data.entries.filter(e => e.id !== item.entryId);
+        }
+      }
+    }
+
+    // Write to Dropbox
+    const ok = await Dropbox.writeFile('/arman-os-data.json', APP.data);
+    if (ok) {
+      APP.syncStatus.lastSync = isoNow();
+      await Dropbox.backup();
+      // Cache locally
+      await IDB.setCache('data', APP.data);
+    }
+
+    APP.syncStatus.syncing = false;
+    APP.syncStatus.online = true;
+  } catch (e) {
+    console.error('Sync failed:', e);
+    APP.syncStatus.syncing = false;
+    APP.syncStatus.error = e.message;
+    // Queue failed writes for retry
+    toast('Sync failed — working offline');
+  }
+  render();
+}
+
+async function loadData() {
+  if (!APP.keys?.dropbox) return;
+  try {
+    APP.data = await Dropbox.readFile('/arman-os-data.json');
+    APP.syncStatus.lastSync = isoNow();
+    APP.syncStatus.online = true;
+    await IDB.setCache('data', APP.data);
+  } catch (e) {
+    console.warn('Loading from Dropbox failed, trying cache:', e);
+    const cached = await IDB.getCache('data');
+    if (cached) {
+      APP.data = cached;
+      toast('Working from cached data');
+    }
+    APP.syncStatus.error = e.message;
+  }
+}
+
+// ═══════════════════════════════════════════
+// Data Operations (append model)
+// ═══════════════════════════════════════════
+function addEntry(entry) {
+  entry.id = entry.id || uid();
+  entry.created_at = entry.created_at || isoNow();
+  entry.updated_at = isoNow();
+  APP.data.entries.push(entry);
+
+  if (navigator.onLine && APP.keys?.dropbox) {
+    syncData();
+  } else {
+    IDB.enqueue({ type: 'add_entry', entry });
+    toast('Saved offline — will sync when connected');
+  }
+  render();
+}
+
+function updateEntry(entry) {
+  entry.updated_at = isoNow();
+  const idx = APP.data.entries.findIndex(e => e.id === entry.id);
+  if (idx >= 0) APP.data.entries[idx] = entry;
+
+  if (navigator.onLine && APP.keys?.dropbox) {
+    syncData();
+  } else {
+    IDB.enqueue({ type: 'update_entry', entry });
+  }
+  render();
+}
+
+function deleteEntry(id) {
+  APP.data.entries = APP.data.entries.filter(e => e.id !== id);
+
+  if (navigator.onLine && APP.keys?.dropbox) {
+    syncData();
+  } else {
+    IDB.enqueue({ type: 'delete_entry', entryId: id });
+  }
+  render();
+}
+
+// ── Convenience accessors ──
+function getTasks() {
+  return APP.data.entries.filter(e => e.type === 'task' && e.status !== 'scratched');
+}
+function getOpenTasks() {
+  return getTasks().filter(t => t.status === 'open');
+}
+function getNotes() {
+  return APP.data.entries.filter(e => e.type === 'note').sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+// ═══════════════════════════════════════════
+// ICS Calendar Parser
+// ═══════════════════════════════════════════
+async function loadCalendars() {
+  if (!APP.keys?.google_ics_urls) return;
+  const urls = APP.keys.google_ics_urls;
+  const allEvents = [];
+
+  for (let ci = 0; ci < urls.length; ci++) {
+    try {
+      // Use a CORS proxy or direct fetch (may need proxy in production)
+      const resp = await fetch(urls[ci]);
+      if (!resp.ok) continue;
+      const text = await resp.text();
+      const events = parseICS(text, ci);
+      allEvents.push(...events);
+    } catch (e) {
+      console.warn(`Calendar ${ci} fetch failed:`, e);
+    }
+  }
+
+  // Sort by start time, keep next 5 days
+  const fiveDaysOut = new Date(Date.now() + 5 * 86400000).toISOString();
+  APP.calEvents = allEvents
+    .filter(ev => ev.start >= new Date().toISOString().slice(0,10) && ev.start <= fiveDaysOut)
+    .sort((a, b) => a.start.localeCompare(b.start));
+
+  await IDB.setCache('calendar', APP.calEvents);
+  render();
+}
+
+function parseICS(text, calIndex) {
+  const events = [];
+  const blocks = text.split('BEGIN:VEVENT');
+
+  for (let i = 1; i < blocks.length; i++) {
+    const block = blocks[i].split('END:VEVENT')[0];
+    const get = (key) => {
+      // Handle both DTSTART;... and DTSTART:... formats
+      const regex = new RegExp(`^${key}[;:](.*)$`, 'm');
+      const m = block.match(regex);
+      if (!m) return '';
+      let val = m[1];
+      // Strip parameters like TZID=... by taking after last colon if present
+      if (val.includes(':')) val = val.split(':').pop();
+      return val.trim();
+    };
+
+    const summary = get('SUMMARY') || 'Untitled';
+    let dtstart = get('DTSTART');
+    let dtend = get('DTEND');
+
+    if (!dtstart) continue;
+
+    // Parse ICS date formats
+    const parseICSDate = (s) => {
+      if (!s) return null;
+      // 20260415T140000Z or 20260415T140000 or 20260415
+      if (s.length === 8) return new Date(s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8)).toISOString();
+      const y = s.slice(0,4), mo = s.slice(4,6), d = s.slice(6,8);
+      const h = s.slice(9,11) || '00', mi = s.slice(11,13) || '00';
+      return new Date(`${y}-${mo}-${d}T${h}:${mi}:00`).toISOString();
+    };
+
+    events.push({
+      title: summary.replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\n/g, ' '),
+      start: parseICSDate(dtstart),
+      end: parseICSDate(dtend) || parseICSDate(dtstart),
+      calendar: calIndex,
+    });
+  }
+  return events;
+}
+
+// ═══════════════════════════════════════════
+// Claude API — Intelligence Layer
+// ═══════════════════════════════════════════
+const Claude = {
+  // Token budget: ~12K input tokens
+  buildContext() {
+    const tasks = getOpenTasks();
+    const notes = getNotes();
+    const h1 = tasks.filter(t => t.horizon === 'H1');
+    const pinned = APP.data.entries.filter(e => e.pinned);
+
+    // Priority order payload construction
+    let parts = [];
+    let tokenEst = 0;
+
+    // 1. System prompt (~500 tokens)
+    const sysPrompt = `You are the intelligence engine of ArmanOS, a personal operating system for Arman Lari (Ace), Barcelona-based Managing Director of BBAG and co-founder of Casa Lari Group. He operates across 7 domains: BBAG (advisory), Casa Lari (real estate), FFAR (exam prep), Ace (personal admin), Family, Creative, TradNorm (media).
+
+Current time: ${new Date().toLocaleString('en-GB')}
+Time of day: ${timeOfDay()}
+Energy level: ${APP.energy}
+FFAR exam: ${APP.FFAR_EXAM} (${daysBetween(isoNow(), APP.FFAR_EXAM)} days away)
+
+Respond concisely. No pleasantries. Lead with actionable intelligence.`;
+    tokenEst += 200;
+
+    // 2. H1 tasks
+    if (h1.length > 0) {
+      parts.push('H1 TASKS (Locked):\n' + h1.map(t =>
+        `- ${t.title} [${t.domain}]${t.due_date ? ' due:' + t.due_date : ''}${t.waiting_on ? ' waiting:' + t.waiting_on : ''}`
+      ).join('\n'));
+      tokenEst += h1.length * 30;
+    }
+
+    // 3. Today's calendar
+    const today = new Date().toISOString().slice(0,10);
+    const todayEvents = APP.calEvents.filter(e => e.start.slice(0,10) === today);
+    if (todayEvents.length > 0) {
+      parts.push('TODAY CALENDAR:\n' + todayEvents.map(e => `- ${fmtTime(e.start)} ${e.title}`).join('\n'));
+      tokenEst += todayEvents.length * 15;
+    }
+
+    // 4. Pinned entries
+    if (pinned.length > 0) {
+      parts.push('PINNED:\n' + pinned.slice(0, 20).map(e =>
+        `- [${e.type}] ${e.title || e.body?.slice(0, 50)}`
+      ).join('\n'));
+      tokenEst += pinned.length * 20;
+    }
+
+    // 5. Last 3 days raw entries
+    const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
+    const recent = APP.data.entries
+      .filter(e => e.created_at > threeDaysAgo && !e.pinned)
+      .slice(-30);
+    if (recent.length > 0 && tokenEst < 10000) {
+      parts.push('RECENT (3 days):\n' + recent.map(e =>
+        `- [${e.type}] ${e.title || ''} ${(e.body || e.note || '').slice(0, 50)}`
+      ).join('\n'));
+      tokenEst += recent.length * 25;
+    }
+
+    // 6. All open tasks (non-H1)
+    const other = tasks.filter(t => t.horizon !== 'H1');
+    if (other.length > 0 && tokenEst < 11000) {
+      parts.push('OPEN TASKS:\n' + other.map(t =>
+        `- ${t.title} [${t.domain}/${t.horizon}]${t.due_date ? ' due:' + t.due_date : ''}${t.waiting_on ? ' waiting:' + t.waiting_on : ''}`
+      ).join('\n'));
+    }
+
+    return { system: sysPrompt, context: parts.join('\n\n') };
+  },
+
+  async generateBrief() {
+    if (!APP.keys?.anthropic) return;
+    APP.briefLoading = true;
+    render();
+
+    const { system, context } = this.buildContext();
+    const overdue = getOpenTasks().filter(t => t.due_date && daysBetween(isoNow(), t.due_date) < 0);
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': APP.keys.anthropic,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 400,
+          system,
+          messages: [{
+            role: 'user',
+            content: `${context}\n\nGenerate a brief for this ${timeOfDay()} open. Energy: ${APP.energy}. Include:\n1. Top 3 priorities right now\n2. One cross-domain risk or connection\n3. Overdue count: ${overdue.length}\n4. Any calendar events today\n\nBe terse. No headers. No bullet symbols. Just numbered lines. Max 8 lines.`
+          }],
+        }),
+      });
+
+      if (!resp.ok) throw new Error(`Claude API: ${resp.status}`);
+      const data = await resp.json();
+      const text = data.content?.[0]?.text || 'Brief unavailable.';
+
+      APP.liveBrief = text;
+      APP.cachedBrief = text;
+      await IDB.setCache('brief', text);
+    } catch (e) {
+      console.error('Brief generation failed:', e);
+      if (!APP.cachedBrief) {
+        const cached = await IDB.getCache('brief');
+        if (cached) APP.cachedBrief = cached;
+      }
+    }
+
+    APP.briefLoading = false;
+    render();
+  },
+
+  async processInbox(rawInput) {
+    if (!APP.keys?.anthropic) return null;
+
+    const { system } = this.buildContext();
+
+    try {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': APP.keys.anthropic,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 800,
+          system,
+          messages: [{
+            role: 'user',
+            content: `Process this input and extract action items as tasks. For each task, provide: title, suggested domain (BBAG/Casa Lari/FFAR/Ace/Family/Creative/TradNorm), suggested horizon (H1/H2/H3), and any due dates or people mentioned.
+
+INPUT:
+${rawInput}
+
+Respond ONLY with valid JSON array: [{"title":"...","domain":"...","horizon":"...","due_date":"","waiting_on":"","note":"..."}]
+If no tasks found, return []. No other text.`
+          }],
+        }),
+      });
+
+      if (!resp.ok) throw new Error(`Claude API: ${resp.status}`);
+      const data = await resp.json();
+      const text = data.content?.[0]?.text || '[]';
+
+      // Parse JSON from Claude's response
+      const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      return JSON.parse(cleaned);
+    } catch (e) {
+      console.error('Inbox processing failed:', e);
+      return null;
+    }
+  },
+};
+
+// ═══════════════════════════════════════════
+// Streak Counter
+// ═══════════════════════════════════════════
+function calculateStreak() {
+  const logs = APP.data.entries
+    .filter(e => e.type === 'log' || e.type === 'intention')
+    .map(e => e.created_at.slice(0, 10));
+  const unique = [...new Set(logs)].sort().reverse();
+
+  let streak = 0;
+  const today = new Date().toISOString().slice(0, 10);
+  let check = today;
+
+  for (let i = 0; i < 365; i++) {
+    if (unique.includes(check)) {
+      streak++;
+      const d = new Date(check);
+      d.setDate(d.getDate() - 1);
+      check = d.toISOString().slice(0, 10);
+    } else if (check === today) {
+      // Today hasn't been logged yet, that's ok
+      const d = new Date(check);
+      d.setDate(d.getDate() - 1);
+      check = d.toISOString().slice(0, 10);
+    } else {
+      break;
+    }
+  }
+  APP.streak = streak;
+}
+
+// ═══════════════════════════════════════════
+// Export to Markdown
+// ═══════════════════════════════════════════
+function exportAll() {
+  const tasks = getTasks();
+  const notes = getNotes();
+  let md = `# ArmanOS Export\n_${new Date().toLocaleString('en-GB')}_\n\n`;
+
+  md += `## Tasks (${tasks.length})\n\n`;
+  for (const d of Object.keys(APP.domains)) {
+    const dt = tasks.filter(t => t.domain === d);
+    if (dt.length === 0) continue;
+    md += `### ${d}\n`;
+    for (const t of dt) {
+      md += `- [${t.status === 'open' ? ' ' : 'x'}] **${t.title}** (${t.horizon}, ${t.priority})`;
+      if (t.due_date) md += ` — due ${t.due_date}`;
+      if (t.waiting_on) md += ` — waiting on ${t.waiting_on}`;
+      md += '\n';
+      if (t.note) md += `  _${t.note}_\n`;
+    }
+    md += '\n';
+  }
+
+  md += `## Notes (${notes.length})\n\n`;
+  for (const n of notes) {
+    md += `### ${n.title}\n_${n.domain} · ${fmtDate(n.created_at)}_\n\n${n.body || ''}\n\n`;
+  }
+
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `arman-os-export-${new Date().toISOString().slice(0,10)}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Exported to Markdown');
+}
+
+// ═══════════════════════════════════════════
+// Render Engine
+// ═══════════════════════════════════════════
+function render() {
+  const root = document.getElementById('app');
+  const mobile = isMobile();
+  const tasks = getOpenTasks();
+  const notes = getNotes();
+
+  // Sort tasks by horizon then due date
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const tier = { H1: 0, H2: 1, H3: 2 };
+    const ta = tier[a.horizon] ?? 3, tb = tier[b.horizon] ?? 3;
+    if (ta !== tb) return ta - tb;
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    if (a.due_date) return -1;
+    if (b.due_date) return 1;
+    return 0;
+  });
+
+  // Filter
+  let filtered = sortedTasks;
+  if (APP.sprintMode) filtered = filtered.filter(t => t.domain === 'FFAR');
+  if (APP.selectedDomain && !APP.sprintMode) filtered = filtered.filter(t => t.domain === APP.selectedDomain);
+  if (APP.searchQuery) {
+    const q = APP.searchQuery.toLowerCase();
+    filtered = filtered.filter(t =>
+      t.title.toLowerCase().includes(q) || t.domain.toLowerCase().includes(q) ||
+      (t.waiting_on || '').toLowerCase().includes(q) || (t.note || '').toLowerCase().includes(q)
+    );
+  }
+
+  const h1 = filtered.filter(t => t.horizon === 'H1');
+  const h2 = filtered.filter(t => t.horizon === 'H2');
+  const h3 = filtered.filter(t => t.horizon === 'H3');
+
+  // Domain counts
+  const counts = {};
+  Object.keys(APP.domains).forEach(d => {
+    counts[d] = tasks.filter(t => t.domain === d).length;
+  });
+
+  // Brief
+  const briefText = APP.liveBrief || APP.cachedBrief || generateLocalBrief(tasks);
+  const briefIsCached = !APP.liveBrief && APP.cachedBrief;
+
+  // FFAR countdown
+  const ffarDays = daysBetween(isoNow(), APP.FFAR_EXAM);
+
+  // Calendar — group by day
+  const calDays = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(Date.now() + i * 86400000);
+    const ds = d.toISOString().slice(0, 10);
+    calDays.push({
+      date: d,
+      dateStr: ds,
+      events: APP.calEvents.filter(e => e.start && e.start.slice(0, 10) === ds),
+      isToday: i === 0,
+    });
+  }
+
+  const calColors = ['var(--accent)', '#7A8C6E'];
+
+  // ── Build HTML ──
+  if (mobile) {
+    root.innerHTML = renderMobile(filtered, h1, h2, h3, counts, briefText, briefIsCached, ffarDays, calDays, calColors, notes);
+  } else {
+    root.innerHTML = renderDesktop(filtered, h1, h2, h3, counts, briefText, briefIsCached, ffarDays, calDays, calColors, notes);
+  }
+
+  // Toast
+  if (APP.toastMsg) {
+    root.innerHTML += `<div class="toast">${esc(APP.toastMsg)}</div>`;
+  }
+
+  // Modals
+  if (APP.showModal === 'addTask') root.innerHTML += renderAddTaskModal();
+  if (APP.showModal === 'inbox') root.innerHTML += renderInboxModal();
+  if (APP.showModal === 'taskDetail' && APP.selectedTask) root.innerHTML += renderTaskDetailModal();
+  if (APP.showModal === 'endOfDay') root.innerHTML += renderEndOfDayModal();
+
+  bindEvents();
+}
+
+function generateLocalBrief(tasks) {
+  const tod = timeOfDay();
+  const overdue = tasks.filter(t => t.due_date && daysBetween(isoNow(), t.due_date) < 0);
+  const h1 = tasks.filter(t => t.horizon === 'H1' && t.status === 'open');
+  const waiting = tasks.filter(t => t.waiting_on && t.status === 'open');
+  const ffarDays = daysBetween(isoNow(), APP.FFAR_EXAM);
+
+  let lines = [`Good ${tod}, Ace.`];
+  if (overdue.length > 0) lines.push(`${overdue.length} overdue item${overdue.length > 1 ? 's' : ''} requiring attention.`);
+  if (h1.length > 0) lines.push(`Top priority: ${h1[0].title}`);
+  if (h1.length > 1) lines.push(`Also locked: ${h1.slice(1, 3).map(t => t.title).join('; ')}`);
+  if (waiting.length > 0) lines.push(`Waiting on: ${[...new Set(waiting.map(t => t.waiting_on))].join(', ')}`);
+  if (ffarDays > 0 && ffarDays <= 21) lines.push(`FFAR exam in ${ffarDays} days.`);
+  if (APP.energy === 'Low') lines.push('Low energy — surfacing admin and logistics.');
+  if (APP.energy === 'High') lines.push('High energy — surfacing deep work and creative tasks.');
+  return lines.join('\n');
+}
+
+// ═══════════════════════════════════════════
+// HTML Renderers
+// ═══════════════════════════════════════════
+
+function renderTaskHTML(t) {
+  const domColor = APP.domains[t.domain]?.color || 'var(--text-dim)';
+  const isH1 = t.horizon === 'H1';
+  const daysLeft = t.due_date ? daysBetween(isoNow(), t.due_date) : null;
+  const overdue = daysLeft !== null && daysLeft < 0;
+
+  return `<div class="task-row ${isH1 ? 'h1' : ''}" style="border-left:4px solid ${domColor}" data-action="selectTask" data-id="${t.id}">
+    <div style="display:flex;align-items:flex-start;gap:8px">
+      <button class="checkbox" data-action="completeTask" data-id="${t.id}"></button>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${isH1?600:400};line-height:1.4">${esc(t.title)}</div>
+        <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap;align-items:center">
+          <span class="badge" style="background:${domColor}22;color:${domColor}">${esc(t.domain)}</span>
+          <span class="badge" style="background:${isH1?'var(--accent)':t.horizon==='H2'?'var(--text-muted)':'var(--text-dim)'}22;color:${isH1?'var(--accent)':t.horizon==='H2'?'var(--text-muted)':'var(--text-dim)'}">${t.horizon}</span>
+          ${t.due_date ? `<span style="font-size:10px;font-family:var(--mono);color:${overdue||daysLeft<=2?'var(--error)':'var(--text-dim)'}">${fmtDate(t.due_date)}${overdue?' OVERDUE':''}</span>` : ''}
+          ${t.waiting_on ? `<span style="font-size:10px;font-family:var(--mono);color:var(--accent)">⏳ ${esc(t.waiting_on)}</span>` : ''}
+          ${t.pinned ? '<span style="font-size:10px;color:var(--accent)">📌</span>' : ''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTaskGroup(label, tasks, countColor) {
+  if (tasks.length === 0) return '';
+  return `<div style="margin-bottom:16px">
+    <div class="section-label">${label}<span style="float:right;color:${countColor}">${tasks.length}</span></div>
+    ${tasks.map(renderTaskHTML).join('')}
+  </div>`;
+}
+
+function renderLeftColumn(counts, ffarDays) {
+  const domainBtns = Object.entries(APP.domains).map(([key, d]) => {
+    if (APP.sprintMode && key !== 'FFAR') return '';
+    const active = APP.selectedDomain === key;
+    return `<button class="domain-btn ${active?'active':''}" data-action="selectDomain" data-domain="${key}">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="domain-dot" style="background:${d.color}"></div>
+        <span>${d.label}</span>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">${counts[key]||0}</span>
+    </button>`;
+  }).join('');
+
+  return `<div class="col" style="padding:14px">
+    <div style="font-family:var(--serif);font-size:20px;letter-spacing:0.02em;margin-bottom:4px">ArmanOS</div>
+    <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim);letter-spacing:0.1em;margin-bottom:16px">v1.0 · PHASE 1</div>
+
+    <div class="streak-bar">
+      <span style="font-size:12px">⚡</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--accent)">${APP.streak} day streak</span>
+    </div>
+
+    ${ffarDays > 0 ? `<div class="ffar-countdown">
+      <div style="font-family:var(--serif);font-size:11px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase">FFAR Exam</div>
+      <div style="font-family:var(--serif);font-size:32px;color:var(--accent);line-height:1.2;margin-top:2px">${ffarDays}</div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text-dim)">days remaining</div>
+    </div>` : ''}
+
+    <button class="btn-ghost sprint-btn ${APP.sprintMode?'active':''}" data-action="toggleSprint">
+      ▸ ${APP.sprintMode ? 'EXIT SPRINT' : 'FFAR SPRINT'}
+    </button>
+
+    <div class="section-label">Domains</div>
+    ${domainBtns}
+
+    <div class="sync-status">
+      <div class="section-label">System</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="font-size:10px;color:${APP.syncStatus.online?'var(--success)':'var(--error)'}">●</span>
+        <span style="font-family:var(--mono);font-size:10px;color:${APP.syncStatus.online?'var(--success)':'var(--error)'}">
+          ${APP.syncStatus.syncing ? 'Syncing...' : APP.syncStatus.online ? 'Online' : 'Offline'}
+        </span>
+        ${APP.syncStatus.syncing ? '<span class="spinner"></span>' : ''}
+      </div>
+      ${APP.syncStatus.lastSync ? `<div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Last sync: ${fmtTime(APP.syncStatus.lastSync)}</div>` : ''}
+      <div style="font-family:var(--mono);font-size:9px;color:var(--text-dim)">Data: ${APP.syncStatus.fileSize}</div>
+      ${APP.syncStatus.error ? `<div style="font-family:var(--mono);font-size:9px;color:var(--error);margin-top:2px">${esc(APP.syncStatus.error.slice(0,40))}</div>` : ''}
+
+      <button class="btn-ghost" style="width:100%;margin-top:8px;font-size:10px" data-action="export">⬇ Export All</button>
+      <button class="btn-ghost" style="width:100%;margin-top:4px;font-size:10px" data-action="endOfDay">📝 End of Day</button>
+    </div>
+  </div>`;
+}
+
+function renderCentreColumn(h1, h2, h3, filtered) {
+  return `<div class="col">
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <button class="btn" data-action="showAddTask" style="display:flex;align-items:center;gap:4px">+ New Task</button>
+      <button class="btn-ghost" data-action="showInbox" style="display:flex;align-items:center;gap:4px">📥 Inbox</button>
+      <button class="btn-ghost" data-action="toggleSearch">🔍</button>
+    </div>
+
+    ${APP.searchQuery !== '' || APP.showModal === 'search' ? `<div style="margin-bottom:10px">
+      <input class="input" placeholder="Search tasks..." value="${esc(APP.searchQuery)}" data-action="search" autofocus>
+    </div>` : ''}
+
+    ${renderTaskGroup('H1 · Locked', h1, 'var(--accent)')}
+    ${renderTaskGroup('H2 · Compounding', h2, 'var(--text-muted)')}
+    ${renderTaskGroup('H3 · Latent', h3, 'var(--text-dim)')}
+
+    ${filtered.length === 0 ? `<div style="text-align:center;padding:40px 0;color:var(--text-dim)">
+      <div style="font-family:var(--serif);font-size:16px;margin-bottom:4px">${APP.searchQuery ? 'No matching tasks' : 'All clear'}</div>
+      <div style="font-size:11px">${APP.searchQuery ? 'Try a different search' : 'Press N to add a task'}</div>
+    </div>` : ''}
+  </div>`;
+}
+
+function renderRightColumn(briefText, briefIsCached, calDays, calColors, notes) {
+  const briefLines = briefText.split('\n').filter(l => l.trim());
+
+  const calHTML = calDays.map(day => {
+    const label = day.isToday ? 'TODAY' : fmtDay(day.date);
+    return `<div style="margin-bottom:8px">
+      <div class="cal-day-label ${day.isToday?'today':''}">${label}</div>
+      ${day.events.length === 0 ? '<div style="font-size:11px;color:var(--text-dim);padding-left:8px;font-style:italic">No events</div>' :
+        day.events.map(ev => `<div class="cal-event" style="border-left:3px solid ${calColors[ev.calendar]||'var(--text-dim)'}">
+          <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-right:6px">${ev.start ? fmtTime(ev.start) : ''}</span>
+          ${esc(ev.title)}
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+
+  const notesHTML = notes.slice(0, 8).map(n => {
+    const domColor = APP.domains[n.domain]?.color || 'var(--text-dim)';
+    return `<div class="card" style="border-left:3px solid ${domColor}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div style="font-size:12px;font-weight:500;line-height:1.4">${esc(n.title)}</div>
+        ${n.pinned ? '<span style="font-size:10px;color:var(--accent)">📌</span>' : ''}
+      </div>
+      <div style="font-size:10px;font-family:var(--mono);color:var(--text-dim);margin-top:3px">${fmtDate(n.created_at)} · ${esc(n.domain)}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="col" style="border-right:none">
+    <div style="margin-bottom:14px">
+      <div class="section-label">Energy</div>
+      <div style="display:flex;gap:4px">
+        ${['Low','Medium','High'].map(l => `<button class="energy-btn ${APP.energy===l?'active':''}" data-action="setEnergy" data-value="${l}">${l}</button>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="section-label">Brief · ${timeOfDay()} ${briefIsCached ? '<span style="color:var(--text-dim)">(cached)</span>' : ''} ${APP.briefLoading ? '<span class="spinner"></span>' : ''}</div>
+      <div class="brief-panel">
+        ${briefLines.map((line, i) => `<div class="brief-line ${i===0?'brief-greeting':'brief-item'}">${esc(line)}</div>`).join('')}
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div class="section-label">Calendar · 5 Days</div>
+      ${APP.calEvents.length > 0 || calDays.some(d => d.events.length > 0) ? calHTML : '<div style="font-size:11px;color:var(--text-dim);font-style:italic">No calendar data loaded</div>'}
+    </div>
+
+    <div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-label" style="margin-bottom:0;padding-bottom:0;border:none">Notes</div>
+        <button class="btn-ghost" style="font-size:10px;padding:3px 8px" data-action="addNote">+</button>
+      </div>
+      ${notesHTML}
+    </div>
+  </div>`;
+}
+
+function renderDesktop(filtered, h1, h2, h3, counts, briefText, briefIsCached, ffarDays, calDays, calColors, notes) {
+  return `<div class="desktop">
+    ${renderLeftColumn(counts, ffarDays)}
+    ${renderCentreColumn(h1, h2, h3, filtered)}
+    ${renderRightColumn(briefText, briefIsCached, calDays, calColors, notes)}
+  </div>`;
+}
+
+function renderMobile(filtered, h1, h2, h3, counts, briefText, briefIsCached, ffarDays, calDays, calColors, notes) {
+  let content = '';
+  const tab = APP.mobileTab;
+
+  const header = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;padding:12px 14px 0">
+    <div>
+      <span style="font-family:var(--serif);font-size:18px">ArmanOS</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-left:8px">${APP.streak}⚡</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" style="padding:4px 8px" data-action="showAddTask">+</button>
+      <button class="btn-ghost" style="padding:4px 8px" data-action="showInbox">📥</button>
+    </div>
+  </div>`;
+
+  if (tab === 'brief') {
+    content = `<div class="col" style="border:none">${renderRightColumn(briefText, briefIsCached, calDays, calColors, notes)}</div>`;
+  } else if (tab === 'focus') {
+    content = `<div class="col" style="border:none">${renderCentreColumn(h1, h2, h3, filtered).replace('<div class="col">', '<div>').replace('</div>\n', '')}</div>`;
+  } else if (tab === 'domains') {
+    content = renderLeftColumn(counts, ffarDays).replace('class="col"', 'class="col" style="border:none;height:auto"');
+  } else if (tab === 'notes') {
+    const notesContent = notes.map(n => {
+      const domColor = APP.domains[n.domain]?.color || 'var(--text-dim)';
+      return `<div class="card" style="border-left:3px solid ${domColor}">
+        <div style="font-size:12px;font-weight:500;line-height:1.4">${esc(n.title)}</div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--text-dim);margin-top:3px">${fmtDate(n.created_at)} · ${esc(n.domain)}</div>
+        ${n.body ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.4">${esc(n.body).slice(0,120)}${n.body.length>120?'...':''}</div>` : ''}
+      </div>`;
+    }).join('');
+    content = `<div style="padding:0 14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="section-label" style="margin:0;padding:0;border:none">Notes</div>
+        <button class="btn-ghost" style="font-size:10px;padding:3px 8px" data-action="addNote">+ New Note</button>
+      </div>
+      ${notesContent}
+    </div>`;
+  }
+
+  return `<div class="mobile-tab-content">
+    ${header}
+    ${content}
+  </div>
+  <div class="tab-bar">
+    ${[{k:'brief',l:'Brief',i:'⚡'},{k:'focus',l:'Focus',i:'◎'},{k:'domains',l:'Domains',i:'▦'},{k:'notes',l:'Notes',i:'📄'}].map(t =>
+      `<button class="tab-btn ${APP.mobileTab===t.k?'active':''}" data-action="setTab" data-value="${t.k}">${t.i}<br>${t.l}</button>`
+    ).join('')}
+  </div>`;
+}
+
+// ── Modals ──
+function renderAddTaskModal() {
+  return `<div class="modal-overlay" data-action="closeModal">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="h2" style="margin-bottom:16px">New Task</div>
+      <input class="input" style="margin-bottom:10px" placeholder="Task title" id="newTaskTitle" autofocus>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <select class="select" id="newTaskDomain">${Object.keys(APP.domains).map(d => `<option value="${d}">${d}</option>`).join('')}</select>
+        <select class="select" id="newTaskHorizon">
+          <option value="H1">H1 — Locked</option>
+          <option value="H2" selected>H2 — Compounding</option>
+          <option value="H3">H3 — Latent</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <input class="input" type="date" id="newTaskDue" placeholder="Due date">
+        <input class="input" id="newTaskWaiting" placeholder="Waiting on...">
+      </div>
+      <textarea class="textarea" style="margin-bottom:12px;min-height:60px" id="newTaskNote" placeholder="Notes..."></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-ghost" data-action="closeModal">Cancel</button>
+        <button class="btn" data-action="submitNewTask">Add Task</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderInboxModal() {
+  return `<div class="modal-overlay" data-action="closeModal">
+    <div class="modal modal-wide" onclick="event.stopPropagation()">
+      <div class="h2" style="margin-bottom:4px">Claude Inbox</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:14px">
+        Paste anything — email, WhatsApp, meeting notes, brain dump. Claude extracts tasks.
+      </div>
+      <textarea class="textarea" style="min-height:140px;margin-bottom:10px" id="inboxInput" placeholder="Paste content here..." autofocus></textarea>
+      <div id="inboxResults"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px" id="inboxActions">
+        <button class="btn-ghost" data-action="closeModal">Cancel</button>
+        <button class="btn" data-action="processInbox" id="inboxSubmit">Extract Tasks</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTaskDetailModal() {
+  const t = APP.selectedTask;
+  return `<div class="modal-overlay" data-action="closeModal">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="h2">Edit Task</div>
+        <button class="btn-ghost" style="color:var(--error);border-color:var(--error);font-size:10px" data-action="deleteTask" data-id="${t.id}">Delete</button>
+      </div>
+      <input class="input" style="margin-bottom:10px;font-weight:500" id="editTitle" value="${esc(t.title)}">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <select class="select" id="editDomain">${Object.keys(APP.domains).map(d => `<option value="${d}" ${t.domain===d?'selected':''}>${d}</option>`).join('')}</select>
+        <select class="select" id="editHorizon">
+          <option value="H1" ${t.horizon==='H1'?'selected':''}>H1 — Locked</option>
+          <option value="H2" ${t.horizon==='H2'?'selected':''}>H2 — Compounding</option>
+          <option value="H3" ${t.horizon==='H3'?'selected':''}>H3 — Latent</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <input class="input" type="date" id="editDue" value="${t.due_date||''}">
+        <input class="input" id="editWaiting" placeholder="Waiting on..." value="${esc(t.waiting_on||'')}">
+      </div>
+      <input class="input" style="margin-bottom:10px" id="editProject" placeholder="Project" value="${esc(t.project||'')}">
+      <textarea class="textarea" style="margin-bottom:10px;min-height:60px" id="editNote">${esc(t.note||'')}</textarea>
+      <div style="margin-bottom:14px">
+        <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:6px;cursor:pointer">
+          <input type="checkbox" id="editPinned" ${t.pinned?'checked':''}>
+          Pin (exclude from summary compression)
+        </label>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-ghost" data-action="closeModal">Cancel</button>
+        <button class="btn" data-action="saveTask">Save</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderEndOfDayModal() {
+  return `<div class="modal-overlay" data-action="closeModal">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="h2" style="margin-bottom:4px">End of Day</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:14px">What happened today?</div>
+      <textarea class="textarea" style="min-height:100px;margin-bottom:12px" id="eodInput" placeholder="Free text — what got done, what didn't, what you learned..." autofocus></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-ghost" data-action="closeModal">Cancel</button>
+        <button class="btn" data-action="submitEOD">Save Log</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════
+// Event Binding
+// ═══════════════════════════════════════════
+function bindEvents() {
+  document.querySelectorAll('[data-action]').forEach(el => {
+    const action = el.dataset.action;
+
+    if (action === 'completeTask') {
+      el.onclick = (e) => {
+        e.stopPropagation();
+        const id = el.dataset.id;
+        const row = el.closest('.task-row');
+        if (row) {
+          el.classList.add('checked');
+          row.classList.add('completing');
+          setTimeout(() => {
+            const entry = APP.data.entries.find(e => e.id === id);
+            if (entry) { entry.status = 'complete'; entry.completed_at = isoNow(); }
+            syncData();
+            render();
+          }, 500);
+        }
+      };
+      return;
+    }
+
+    el.onclick = (e) => {
+      switch (action) {
+        case 'selectTask':
+          APP.selectedTask = APP.data.entries.find(t => t.id === el.dataset.id);
+          APP.showModal = 'taskDetail';
+          render();
+          break;
+        case 'selectDomain':
+          APP.selectedDomain = APP.selectedDomain === el.dataset.domain ? null : el.dataset.domain;
+          render();
+          break;
+        case 'toggleSprint':
+          APP.sprintMode = !APP.sprintMode;
+          APP.selectedDomain = null;
+          render();
+          break;
+        case 'setEnergy':
+          APP.energy = el.dataset.value;
+          Claude.generateBrief();
+          render();
+          break;
+        case 'setTab':
+          APP.mobileTab = el.dataset.value;
+          render();
+          break;
+        case 'showAddTask':
+          APP.showModal = 'addTask';
+          render();
+          break;
+        case 'showInbox':
+          APP.showModal = 'inbox';
+          render();
+          break;
+        case 'closeModal':
+          APP.showModal = null;
+          APP.selectedTask = null;
+          render();
+          break;
+        case 'toggleSearch':
+          APP.searchQuery = APP.searchQuery ? '' : '';
+          render();
+          // Focus the search input after render
+          setTimeout(() => {
+            const inp = document.querySelector('[data-action="search"]');
+            if (!inp) {
+              // Create search field
+              APP.showModal = 'search';
+              render();
+            }
+          }, 0);
+          break;
+        case 'export':
+          exportAll();
+          break;
+        case 'endOfDay':
+          APP.showModal = 'endOfDay';
+          render();
+          break;
+        case 'submitNewTask': {
+          const title = document.getElementById('newTaskTitle')?.value?.trim();
+          if (!title) return;
+          addEntry({
+            type: 'task',
+            title,
+            domain: document.getElementById('newTaskDomain')?.value || 'BBAG',
+            project: '',
+            horizon: document.getElementById('newTaskHorizon')?.value || 'H2',
+            priority: document.getElementById('newTaskHorizon')?.value === 'H1' ? 'H' : 'M',
+            status: 'open',
+            due_date: document.getElementById('newTaskDue')?.value || '',
+            waiting_on: document.getElementById('newTaskWaiting')?.value || '',
+            note: document.getElementById('newTaskNote')?.value || '',
+            contacts: [],
+            pinned: false,
+          });
+          APP.showModal = null;
+          toast('Task added');
+          break;
+        }
+        case 'saveTask': {
+          if (!APP.selectedTask) break;
+          const updated = {
+            ...APP.selectedTask,
+            title: document.getElementById('editTitle')?.value || APP.selectedTask.title,
+            domain: document.getElementById('editDomain')?.value || APP.selectedTask.domain,
+            horizon: document.getElementById('editHorizon')?.value || APP.selectedTask.horizon,
+            due_date: document.getElementById('editDue')?.value || '',
+            waiting_on: document.getElementById('editWaiting')?.value || '',
+            project: document.getElementById('editProject')?.value || '',
+            note: document.getElementById('editNote')?.value || '',
+            pinned: document.getElementById('editPinned')?.checked || false,
+          };
+          updateEntry(updated);
+          APP.showModal = null;
+          APP.selectedTask = null;
+          toast('Task updated');
+          break;
+        }
+        case 'deleteTask': {
+          deleteEntry(el.dataset.id);
+          APP.showModal = null;
+          APP.selectedTask = null;
+          toast('Task deleted');
+          break;
+        }
+        case 'processInbox': {
+          const input = document.getElementById('inboxInput')?.value?.trim();
+          if (!input) return;
+          const btn = document.getElementById('inboxSubmit');
+          if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
+
+          Claude.processInbox(input).then(results => {
+            const container = document.getElementById('inboxResults');
+            if (!container) return;
+
+            if (!results || results.length === 0) {
+              container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">No tasks extracted. Try pasting more specific content.</div>';
+              if (btn) { btn.disabled = false; btn.textContent = 'Extract Tasks'; }
+              return;
+            }
+
+            container.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${results.length} task${results.length>1?'s':''} extracted:</div>` +
+              results.map((t, i) => {
+                const domColor = APP.domains[t.domain]?.color || 'var(--text-dim)';
+                return `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
+                  <div>
+                    <div style="font-size:13px">${esc(t.title)}</div>
+                    <span class="badge" style="background:${domColor}22;color:${domColor}">${esc(t.domain)}</span>
+                    <span class="badge" style="background:var(--text-muted)22;color:var(--text-muted)">${t.horizon}</span>
+                  </div>
+                  <button class="btn" style="font-size:10px;padding:3px 8px" onclick="acceptInboxTask(${i})">Accept</button>
+                </div>`;
+              }).join('');
+
+            // Store results globally for accept buttons
+            window._inboxResults = results;
+            const actions = document.getElementById('inboxActions');
+            if (actions) actions.innerHTML = '<button class="btn-ghost" data-action="closeModal">Done</button>';
+            bindEvents();
+          });
+          break;
+        }
+        case 'addNote': {
+          // Quick inline — reuse add task modal pattern but for notes
+          const title = prompt('Note title:');
+          if (!title) return;
+          const body = prompt('Content (optional):') || '';
+          addEntry({
+            type: 'note',
+            title,
+            body,
+            domain: APP.selectedDomain || 'Ace',
+            pinned: false,
+          });
+          toast('Note saved');
+          break;
+        }
+        case 'submitEOD': {
+          const input = document.getElementById('eodInput')?.value?.trim();
+          if (!input) return;
+          addEntry({
+            type: 'log',
+            title: `End of day — ${new Date().toLocaleDateString('en-GB')}`,
+            body: input,
+            domain: 'Ace',
+          });
+          APP.showModal = null;
+          calculateStreak();
+          toast('End-of-day log saved');
+          break;
+        }
+      }
+    };
+  });
+
+  // Search input binding
+  const searchInput = document.querySelector('[data-action="search"]');
+  if (searchInput) {
+    searchInput.oninput = (e) => { APP.searchQuery = e.target.value; render(); };
+    searchInput.onkeydown = (e) => { if (e.key === 'Escape') { APP.searchQuery = ''; render(); } };
+  }
+}
+
+// Global inbox accept function
+window.acceptInboxTask = function(index) {
+  const results = window._inboxResults;
+  if (!results || !results[index]) return;
+  const t = results[index];
+  addEntry({
+    type: 'task',
+    title: t.title,
+    domain: t.domain || 'Ace',
+    horizon: t.horizon || 'H2',
+    priority: t.horizon === 'H1' ? 'H' : 'M',
+    status: 'open',
+    due_date: t.due_date || '',
+    waiting_on: t.waiting_on || '',
+    note: t.note || '',
+    contacts: [],
+    pinned: false,
+    project: '',
+  });
+  // Remove from results
+  results.splice(index, 1);
+  toast('Task accepted');
+  // Re-render inbox results
+  const container = document.getElementById('inboxResults');
+  if (container && results.length === 0) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--success);margin-bottom:10px">All tasks accepted.</div>';
+  }
+};
+
+// ═══════════════════════════════════════════
+// Keyboard Shortcuts
+// ═══════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (APP.showModal) {
+    if (e.key === 'Escape') { APP.showModal = null; APP.selectedTask = null; render(); }
+    return;
+  }
+  if (e.key === 'n' || e.key === 'N') { e.preventDefault(); APP.showModal = 'addTask'; render(); }
+  if (e.key === 'i' || e.key === 'I') { e.preventDefault(); APP.showModal = 'inbox'; render(); }
+  if (e.key === 'e' || e.key === 'E') { e.preventDefault(); APP.showModal = 'endOfDay'; render(); }
+  if (e.key === '/') { e.preventDefault(); APP.searchQuery = ''; render(); setTimeout(() => { const el = document.querySelector('[data-action="search"]'); if (el) el.focus(); }, 50); }
+  if (e.key === 'Escape') { APP.searchQuery = ''; render(); }
+});
+
+// ═══════════════════════════════════════════
+// Online/Offline handlers
+// ═══════════════════════════════════════════
+window.addEventListener('online', () => {
+  APP.syncStatus.online = true;
+  syncData();
+  render();
+});
+window.addEventListener('offline', () => {
+  APP.syncStatus.online = false;
+  render();
+});
+window.addEventListener('resize', () => render());
+
+// ═══════════════════════════════════════════
+// Boot Sequence
+// ═══════════════════════════════════════════
+async function boot() {
+  // 1. Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW registration failed:', e));
+  }
+
+  // 2. Load cached data immediately
+  const cachedData = await IDB.getCache('data');
+  if (cachedData && cachedData.entries) APP.data = cachedData;
+
+  const cachedBrief = await IDB.getCache('brief');
+  if (cachedBrief) APP.cachedBrief = cachedBrief;
+
+  const cachedCal = await IDB.getCache('calendar');
+  if (cachedCal) APP.calEvents = cachedCal;
+
+  // 3. First render with cached data
+  calculateStreak();
+  render();
+
+  // 4. Load keys from Dropbox
+  // For Phase 1, keys are embedded in a known Dropbox location
+  // In production, these would be fetched from /Apps/ArmanOS/keys.json
+  // For now, we try to load them
+  try {
+    // Try loading keys — this needs an initial bootstrap
+    // The user's keys.json is at /Apps/ArmanOS/keys.json
+    // But we need the Dropbox token to read it — chicken-and-egg
+    // Solution: keys are passed via URL hash on first setup, then cached
+
+    const hashKeys = parseKeysFromHash();
+    if (hashKeys) {
+      APP.keys = hashKeys;
+      await IDB.setCache('keys', hashKeys);
+    } else {
+      const cachedKeys = await IDB.getCache('keys');
+      if (cachedKeys) APP.keys = cachedKeys;
+    }
+
+    if (APP.keys) {
+      // 5. Load live data from Dropbox
+      await loadData();
+      calculateStreak();
+      render();
+
+      // 6. Load calendars
+      loadCalendars();
+
+      // 7. Generate Claude brief
+      Claude.generateBrief();
+
+      // 8. Check for notification permission
+      if ('Notification' in window && Notification.permission === 'default') {
+        // Don't ask immediately — wait for user interaction
+      }
+    } else {
+      // No keys — show setup prompt
+      APP.onboarding = true;
+      renderSetup();
+    }
+  } catch (e) {
+    console.error('Boot error:', e);
+    render();
+  }
+}
+
+function parseKeysFromHash() {
+  try {
+    const hash = window.location.hash;
+    if (!hash || hash.length < 10) return null;
+    const decoded = atob(hash.slice(1));
+    return JSON.parse(decoded);
+  } catch { return null; }
+}
+
+function renderSetup() {
+  const root = document.getElementById('app');
+  root.innerHTML = `<div class="onboarding-overlay">
+    <div class="onboarding-card">
+      <div style="font-family:var(--serif);font-size:32px;margin-bottom:8px">ArmanOS</div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:24px">First-time setup</div>
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:20px;text-align:left;max-width:400px;margin-left:auto;margin-right:auto">
+        Paste your keys.json content below to connect ArmanOS to your Dropbox, Claude, and Google Calendar.
+      </div>
+      <textarea class="textarea" id="setupKeys" style="min-height:120px;margin-bottom:12px;font-family:var(--mono);font-size:11px" placeholder='{"dropbox":"...", "anthropic":"...", "google_ics_urls":["...", "..."]}'></textarea>
+      <button class="btn" style="padding:10px 30px" onclick="submitSetup()">Connect</button>
+      <div id="setupError" style="font-size:11px;color:var(--error);margin-top:8px"></div>
+    </div>
+  </div>`;
+}
+
+window.submitSetup = async function() {
+  const input = document.getElementById('setupKeys')?.value?.trim();
+  const errEl = document.getElementById('setupError');
+  if (!input) { if (errEl) errEl.textContent = 'Paste your keys.json content.'; return; }
+
+  try {
+    const keys = JSON.parse(input);
+    if (!keys.dropbox || !keys.anthropic) throw new Error('Missing dropbox or anthropic key');
+
+    // Normalize google_ics_urls
+    if (keys.google_ics_url && !keys.google_ics_urls) {
+      keys.google_ics_urls = Array.isArray(keys.google_ics_url) ? keys.google_ics_url : [keys.google_ics_url];
+      delete keys.google_ics_url;
+    }
+
+    APP.keys = keys;
+    await IDB.setCache('keys', keys);
+    APP.onboarding = false;
+
+    // Boot with keys
+    await loadData();
+    calculateStreak();
+    render();
+    loadCalendars();
+    Claude.generateBrief();
+
+    toast('Connected successfully');
+  } catch (e) {
+    if (errEl) errEl.textContent = `Invalid JSON: ${e.message}`;
+  }
+};
+
+// ── Start ──
+boot();
+</script>
+</body>
+</html>

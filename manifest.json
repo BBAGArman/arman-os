@@ -1,0 +1,23 @@
+{
+  "name": "ArmanOS",
+  "short_name": "ArmanOS",
+  "description": "Personal operating system — task management, intelligence, knowledge.",
+  "start_url": "/arman-os/",
+  "scope": "/arman-os/",
+  "display": "standalone",
+  "background_color": "#1B1613",
+  "theme_color": "#1B1613",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
