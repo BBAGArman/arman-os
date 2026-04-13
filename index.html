@@ -283,6 +283,21 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent) !importa
   max-width: 500px; width: 100%; text-align: center;
 }
 
+/* ── Import modal ── */
+.import-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.import-tab { background: none; border: none; color: var(--text-dim); font-size: 11px; font-family: var(--mono); padding: 6px 12px; cursor: pointer; border-bottom: 2px solid transparent; transition: var(--tr); }
+.import-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.import-quick-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.import-quick-row input { flex: 1; }
+.import-review-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; margin-bottom: 8px; }
+.import-review-card.has-question { border-color: var(--accent); }
+.import-field-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 8px; }
+.import-question { font-size: 11px; color: var(--accent); background: var(--accent-faint); border: 1px solid var(--accent-dim); border-radius: var(--radius); padding: 6px 8px; margin-top: 8px; }
+.import-question input, .import-question select { margin-top: 4px; font-size: 11px; }
+.import-remove { background: none; border: none; color: var(--text-dim); cursor: pointer; font-size: 14px; padding: 0 4px; }
+.import-remove:hover { color: var(--error); }
+.import-counter { font-size: 10px; color: var(--text-dim); font-family: var(--mono); }
+
 /* ── Toast ── */
 .toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
@@ -772,10 +787,11 @@ Respond concisely. No pleasantries. Lead with actionable intelligence.`;
     render();
   },
 
-  async processInbox(rawInput) {
+  async processImport(rawInput) {
     if (!APP.keys?.anthropic) return null;
 
     const { system } = this.buildContext();
+    const today = new Date().toISOString().slice(0, 10);
 
     try {
       const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -788,30 +804,45 @@ Respond concisely. No pleasantries. Lead with actionable intelligence.`;
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 800,
+          max_tokens: 1500,
           system,
           messages: [{
             role: 'user',
-            content: `Process this input and extract action items as tasks. For each task, provide: title, suggested domain (BBAG/Casa Lari/FFAR/Ace/Family/Creative/TradNorm), suggested horizon (H1/H2/H3), and any due dates or people mentioned.
+            content: `Parse this haphazard input into structured tasks. The input may be messy, incomplete, or informal. Today is ${today}.
+
+DOMAINS: BBAG (advisory/consulting), Casa Lari (real estate), FFAR (exam prep), Ace (personal admin), Family, Creative, TradNorm (media)
+HORIZONS: H1 (urgent/locked-in, must do now), H2 (important/compounding, scheduled), H3 (latent/someday)
+
+For EACH item you extract, return:
+- title: clean actionable title
+- domain: best-fit domain
+- horizon: best-fit horizon
+- due_date: ISO date if mentioned or clearly implied, else ""
+- waiting_on: person/thing if mentioned, else ""
+- note: any extra context from the input
+- confidence: "high" or "low" — your confidence in the domain+horizon assignment
+- question: if confidence is "low", a SHORT question to ask the user to clarify (e.g. "Is this BBAG or Casa Lari related?" or "Is this urgent (H1) or can it wait?"). If confidence is "high", set to ""
+
+Be aggressive about extracting — even vague ideas or reminders should become tasks. If something is clearly NOT a task (e.g. a random observation), still include it but set domain to "Ace" and horizon to "H3" with a question.
+
+Relative dates like "tomorrow", "next week", "Friday" should be converted to ISO dates based on today (${today}).
 
 INPUT:
 ${rawInput}
 
-Respond ONLY with valid JSON array: [{"title":"...","domain":"...","horizon":"...","due_date":"","waiting_on":"","note":"..."}]
-If no tasks found, return []. No other text.`
+Respond ONLY with valid JSON: {"tasks": [...], "summary": "one-line summary of what you parsed"}
+If nothing extractable, return {"tasks": [], "summary": "Nothing actionable found."}`
           }],
         }),
       });
 
       if (!resp.ok) throw new Error(`Claude API: ${resp.status}`);
       const data = await resp.json();
-      const text = data.content?.[0]?.text || '[]';
-
-      // Parse JSON from Claude's response
+      const text = data.content?.[0]?.text || '{"tasks":[],"summary":"Error"}';
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       return JSON.parse(cleaned);
     } catch (e) {
-      console.error('Inbox processing failed:', e);
+      console.error('Import processing failed:', e);
       return null;
     }
   },
@@ -964,11 +995,12 @@ function render() {
 
   // Modals
   if (APP.showModal === 'addTask') root.innerHTML += renderAddTaskModal();
-  if (APP.showModal === 'inbox') root.innerHTML += renderInboxModal();
+  if (APP.showModal === 'import') root.innerHTML += renderImportModal();
   if (APP.showModal === 'taskDetail' && APP.selectedTask) root.innerHTML += renderTaskDetailModal();
   if (APP.showModal === 'endOfDay') root.innerHTML += renderEndOfDayModal();
 
   bindEvents();
+  if (APP.showModal === 'import') bindImportQuickKey();
 }
 
 function generateLocalBrief(tasks) {
@@ -1082,7 +1114,7 @@ function renderCentreColumn(h1, h2, h3, filtered) {
   return `<div class="col">
     <div style="display:flex;gap:6px;margin-bottom:14px">
       <button class="btn" data-action="showAddTask" style="display:flex;align-items:center;gap:4px">+ New Task</button>
-      <button class="btn-ghost" data-action="showInbox" style="display:flex;align-items:center;gap:4px">📥 Inbox</button>
+      <button class="btn-ghost" data-action="showImport" style="display:flex;align-items:center;gap:4px">📥 Import</button>
       <button class="btn-ghost" data-action="toggleSearch">🔍</button>
     </div>
 
@@ -1176,12 +1208,42 @@ function renderMobile(filtered, h1, h2, h3, counts, briefText, briefIsCached, ff
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn-ghost" style="padding:4px 8px" data-action="showAddTask">+</button>
-      <button class="btn-ghost" style="padding:4px 8px" data-action="showInbox">📥</button>
+      <button class="btn-ghost" style="padding:4px 8px" data-action="showImport">📥</button>
     </div>
   </div>`;
 
   if (tab === 'brief') {
-    content = `<div class="col" style="border:none">${renderRightColumn(briefText, briefIsCached, calDays, calColors, notes)}</div>`;
+    const briefLines = briefText.split('\n').filter(l => l.trim());
+    const calHTML = calDays.map(day => {
+      const label = day.isToday ? 'TODAY' : fmtDay(day.date);
+      return `<div style="margin-bottom:8px">
+        <div class="cal-day-label ${day.isToday?'today':''}">${label}</div>
+        ${day.events.length === 0 ? '<div style="font-size:11px;color:var(--text-dim);padding-left:8px;font-style:italic">No events</div>' :
+          day.events.map(ev => `<div class="cal-event" style="border-left:3px solid ${calColors[ev.calendar]||'var(--text-dim)'}">
+            <span style="font-family:var(--mono);font-size:10px;color:var(--text-muted);margin-right:6px">${ev.start ? fmtTime(ev.start) : ''}</span>
+            ${esc(ev.title)}
+          </div>`).join('')}
+      </div>`;
+    }).join('');
+
+    content = `<div class="col" style="border:none">
+      <div style="margin-bottom:14px">
+        <div class="section-label">Energy</div>
+        <div style="display:flex;gap:4px">
+          ${['Low','Medium','High'].map(l => `<button class="energy-btn ${APP.energy===l?'active':''}" data-action="setEnergy" data-value="${l}">${l}</button>`).join('')}
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div class="section-label">Brief · ${timeOfDay()} ${briefIsCached ? '<span style="color:var(--text-dim)">(cached)</span>' : ''} ${APP.briefLoading ? '<span class="spinner"></span>' : ''}</div>
+        <div class="brief-panel">
+          ${briefLines.map((line, i) => `<div class="brief-line ${i===0?'brief-greeting':'brief-item'}">${esc(line)}</div>`).join('')}
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <div class="section-label">Calendar · 5 Days</div>
+        ${APP.calEvents.length > 0 || calDays.some(d => d.events.length > 0) ? calHTML : '<div style="font-size:11px;color:var(--text-dim);font-style:italic">No calendar data loaded</div>'}
+      </div>
+    </div>`;
   } else if (tab === 'focus') {
     content = `<div class="col" style="border:none">${renderCentreColumn(h1, h2, h3, filtered).replace('<div class="col">', '<div>').replace('</div>\n', '')}</div>`;
   } else if (tab === 'domains') {
@@ -1242,19 +1304,107 @@ function renderAddTaskModal() {
   </div>`;
 }
 
-function renderInboxModal() {
+function renderImportModal() {
+  const mode = APP.importMode || 'bulk';
+  const reviewing = APP.importResults && APP.importResults.length > 0;
+
+  let body = '';
+  if (!reviewing) {
+    // Input phase
+    body = `
+      <div class="import-tabs">
+        <button class="import-tab ${mode==='bulk'?'active':''}" data-action="importMode" data-value="bulk">Brain Dump</button>
+        <button class="import-tab ${mode==='quick'?'active':''}" data-action="importMode" data-value="quick">Quick Add</button>
+      </div>
+      ${mode === 'bulk' ? `
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">
+          Paste anything — one item per line, messy is fine. Claude will sort it out.
+        </div>
+        <textarea class="textarea" style="min-height:160px;margin-bottom:10px" id="importBulkInput" placeholder="e.g.&#10;call marco about the lease&#10;FFAR chapter 7 by friday&#10;look into new CRM for BBAG&#10;mum's birthday gift&#10;maybe write that blog post about crypto" autofocus></textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <button class="btn-ghost" data-action="closeModal">Cancel</button>
+          <button class="btn" data-action="processImport" id="importSubmit">Parse with Claude</button>
+        </div>
+      ` : `
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:8px">
+          Type a task and hit Enter. Claude categorises it instantly.
+        </div>
+        <div class="import-quick-row">
+          <input class="input" id="importQuickInput" placeholder="e.g. call marco about the lease" autofocus>
+          <button class="btn" data-action="quickAdd" style="white-space:nowrap">Add</button>
+        </div>
+        <div id="importQuickList">${(APP.importQuickQueue||[]).map((t,i) => {
+          const domColor = APP.domains[t.domain]?.color || 'var(--text-dim)';
+          return `<div class="import-review-card" style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <div style="font-size:12px">${esc(t.title)}</div>
+              <span class="badge" style="background:${domColor}22;color:${domColor}">${esc(t.domain)}</span>
+              <span class="badge">${t.horizon}</span>
+              ${t.question ? `<div class="import-question">${esc(t.question)}</div>` : ''}
+            </div>
+            <button class="import-remove" data-action="removeQuick" data-index="${i}">&times;</button>
+          </div>`;
+        }).join('')}</div>
+        ${(APP.importQuickQueue||[]).length > 0 ? `
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+            <button class="btn-ghost" data-action="closeModal">Cancel</button>
+            <button class="btn" data-action="acceptAllImport">Accept All (${APP.importQuickQueue.length})</button>
+          </div>
+        ` : `
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+            <button class="btn-ghost" data-action="closeModal">Cancel</button>
+          </div>
+        `}
+      `}`;
+  } else {
+    // Review phase
+    const results = APP.importResults;
+    const hasQuestions = results.some(t => t.question);
+    body = `
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">${APP.importSummary || ''}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <span class="import-counter">${results.length} task${results.length!==1?'s':''} parsed</span>
+        ${hasQuestions ? '<span style="font-size:10px;color:var(--accent)">Some items need your input</span>' : ''}
+      </div>
+      <div id="importReviewList" style="max-height:50vh;overflow-y:auto">
+        ${results.map((t, i) => {
+          const domColor = APP.domains[t.domain]?.color || 'var(--text-dim)';
+          const low = t.confidence === 'low';
+          return `<div class="import-review-card ${low?'has-question':''}" data-import-idx="${i}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <input class="input" style="font-size:12px;font-weight:500;border:none;padding:0;background:transparent;color:var(--text);flex:1" value="${esc(t.title)}" data-field="title" data-idx="${i}">
+              <button class="import-remove" data-action="removeImport" data-index="${i}">&times;</button>
+            </div>
+            <div class="import-field-row">
+              <select class="select" style="font-size:10px;padding:3px 6px" data-field="domain" data-idx="${i}">
+                ${Object.keys(APP.domains).map(d => `<option value="${d}" ${t.domain===d?'selected':''}>${d}</option>`).join('')}
+              </select>
+              <select class="select" style="font-size:10px;padding:3px 6px" data-field="horizon" data-idx="${i}">
+                <option value="H1" ${t.horizon==='H1'?'selected':''}>H1</option>
+                <option value="H2" ${t.horizon==='H2'?'selected':''}>H2</option>
+                <option value="H3" ${t.horizon==='H3'?'selected':''}>H3</option>
+              </select>
+              <input class="input" type="date" style="font-size:10px;padding:3px 6px" value="${t.due_date||''}" data-field="due_date" data-idx="${i}">
+            </div>
+            ${t.waiting_on ? `<div style="font-size:10px;color:var(--text-dim);margin-top:4px;font-family:var(--mono)">waiting: ${esc(t.waiting_on)}</div>` : ''}
+            ${t.note ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px">${esc(t.note)}</div>` : ''}
+            ${t.question ? `<div class="import-question">${esc(t.question)}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <button class="btn-ghost" data-action="importBack" style="font-size:10px">Back</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-ghost" data-action="closeModal">Cancel</button>
+          <button class="btn" data-action="acceptAllImport">Accept All (${results.length})</button>
+        </div>
+      </div>`;
+  }
+
   return `<div class="modal-overlay" data-action="closeModal">
     <div class="modal modal-wide" onclick="event.stopPropagation()">
-      <div class="h2" style="margin-bottom:4px">Claude Inbox</div>
-      <div style="font-size:11px;color:var(--text-dim);margin-bottom:14px">
-        Paste anything — email, WhatsApp, meeting notes, brain dump. Claude extracts tasks.
-      </div>
-      <textarea class="textarea" style="min-height:140px;margin-bottom:10px" id="inboxInput" placeholder="Paste content here..." autofocus></textarea>
-      <div id="inboxResults"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px" id="inboxActions">
-        <button class="btn-ghost" data-action="closeModal">Cancel</button>
-        <button class="btn" data-action="processInbox" id="inboxSubmit">Extract Tasks</button>
-      </div>
+      <div class="h2" style="margin-bottom:4px">Import</div>
+      ${body}
     </div>
   </div>`;
 }
@@ -1365,13 +1515,19 @@ function bindEvents() {
           APP.showModal = 'addTask';
           render();
           break;
-        case 'showInbox':
-          APP.showModal = 'inbox';
+        case 'showImport':
+          APP.showModal = 'import';
+          APP.importMode = 'bulk';
+          APP.importResults = null;
+          APP.importSummary = '';
+          APP.importQuickQueue = [];
           render();
           break;
         case 'closeModal':
           APP.showModal = null;
           APP.selectedTask = null;
+          APP.importResults = null;
+          APP.importQuickQueue = [];
           render();
           break;
         case 'toggleSearch':
@@ -1441,41 +1597,102 @@ function bindEvents() {
           toast('Task deleted');
           break;
         }
-        case 'processInbox': {
-          const input = document.getElementById('inboxInput')?.value?.trim();
+        case 'importMode':
+          APP.importMode = el.dataset.value;
+          render();
+          break;
+        case 'processImport': {
+          const input = document.getElementById('importBulkInput')?.value?.trim();
           if (!input) return;
-          const btn = document.getElementById('inboxSubmit');
-          if (btn) { btn.disabled = true; btn.textContent = 'Processing...'; }
+          const btn = document.getElementById('importSubmit');
+          if (btn) { btn.disabled = true; btn.textContent = 'Parsing...'; }
 
-          Claude.processInbox(input).then(results => {
-            const container = document.getElementById('inboxResults');
-            if (!container) return;
-
-            if (!results || results.length === 0) {
-              container.innerHTML = '<div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">No tasks extracted. Try pasting more specific content.</div>';
-              if (btn) { btn.disabled = false; btn.textContent = 'Extract Tasks'; }
+          Claude.processImport(input).then(result => {
+            if (!result || !result.tasks || result.tasks.length === 0) {
+              if (btn) { btn.disabled = false; btn.textContent = 'Parse with Claude'; }
+              toast('No tasks found — try adding more detail');
               return;
             }
-
-            container.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">${results.length} task${results.length>1?'s':''} extracted:</div>` +
-              results.map((t, i) => {
-                const domColor = APP.domains[t.domain]?.color || 'var(--text-dim)';
-                return `<div class="card" style="display:flex;justify-content:space-between;align-items:center">
-                  <div>
-                    <div style="font-size:13px">${esc(t.title)}</div>
-                    <span class="badge" style="background:${domColor}22;color:${domColor}">${esc(t.domain)}</span>
-                    <span class="badge" style="background:var(--text-muted)22;color:var(--text-muted)">${t.horizon}</span>
-                  </div>
-                  <button class="btn" style="font-size:10px;padding:3px 8px" onclick="acceptInboxTask(${i})">Accept</button>
-                </div>`;
-              }).join('');
-
-            // Store results globally for accept buttons
-            window._inboxResults = results;
-            const actions = document.getElementById('inboxActions');
-            if (actions) actions.innerHTML = '<button class="btn-ghost" data-action="closeModal">Done</button>';
-            bindEvents();
+            APP.importResults = result.tasks;
+            APP.importSummary = result.summary || '';
+            render();
           });
+          break;
+        }
+        case 'quickAdd': {
+          const input = document.getElementById('importQuickInput')?.value?.trim();
+          if (!input) return;
+          document.getElementById('importQuickInput').value = '';
+          if (!APP.importQuickQueue) APP.importQuickQueue = [];
+
+          // If API key exists, parse with Claude; otherwise do local parse
+          if (APP.keys?.anthropic) {
+            const btn = el; btn.disabled = true; btn.textContent = '...';
+            Claude.processImport(input).then(result => {
+              if (result && result.tasks && result.tasks.length > 0) {
+                APP.importQuickQueue.push(...result.tasks);
+              } else {
+                // Fallback: raw task
+                APP.importQuickQueue.push({ title: input, domain: 'Ace', horizon: 'H2', due_date: '', waiting_on: '', note: '', confidence: 'low', question: 'Which domain does this belong to?' });
+              }
+              render();
+              setTimeout(() => document.getElementById('importQuickInput')?.focus(), 50);
+            });
+          } else {
+            APP.importQuickQueue.push({ title: input, domain: 'Ace', horizon: 'H2', due_date: '', waiting_on: '', note: '', confidence: 'low', question: '' });
+            render();
+            setTimeout(() => document.getElementById('importQuickInput')?.focus(), 50);
+          }
+          break;
+        }
+        case 'removeQuick': {
+          const idx = parseInt(el.dataset.index);
+          if (APP.importQuickQueue) APP.importQuickQueue.splice(idx, 1);
+          render();
+          break;
+        }
+        case 'removeImport': {
+          const idx = parseInt(el.dataset.index);
+          if (APP.importResults) APP.importResults.splice(idx, 1);
+          if (APP.importResults && APP.importResults.length === 0) APP.importResults = null;
+          render();
+          break;
+        }
+        case 'importBack':
+          APP.importResults = null;
+          APP.importSummary = '';
+          render();
+          break;
+        case 'acceptAllImport': {
+          const items = APP.importResults || APP.importQuickQueue || [];
+          // Read any inline edits from the review cards before accepting
+          document.querySelectorAll('[data-field][data-idx]').forEach(field => {
+            const idx = parseInt(field.dataset.idx);
+            const key = field.dataset.field;
+            if (items[idx]) items[idx][key] = field.value;
+          });
+          let count = 0;
+          items.forEach(t => {
+            addEntry({
+              type: 'task',
+              title: t.title,
+              domain: Object.keys(APP.domains).includes(t.domain) ? t.domain : 'Ace',
+              horizon: ['H1','H2','H3'].includes(t.horizon) ? t.horizon : 'H2',
+              priority: t.horizon === 'H1' ? 'H' : 'M',
+              status: 'open',
+              due_date: t.due_date || '',
+              waiting_on: t.waiting_on || '',
+              note: t.note || '',
+              contacts: [],
+              pinned: false,
+              project: '',
+            });
+            count++;
+          });
+          APP.importResults = null;
+          APP.importQuickQueue = [];
+          APP.showModal = null;
+          toast(`${count} task${count!==1?'s':''} imported`);
           break;
         }
         case 'addNote': {
@@ -1519,34 +1736,18 @@ function bindEvents() {
   }
 }
 
-// Global inbox accept function
-window.acceptInboxTask = function(index) {
-  const results = window._inboxResults;
-  if (!results || !results[index]) return;
-  const t = results[index];
-  addEntry({
-    type: 'task',
-    title: t.title,
-    domain: t.domain || 'Ace',
-    horizon: t.horizon || 'H2',
-    priority: t.horizon === 'H1' ? 'H' : 'M',
-    status: 'open',
-    due_date: t.due_date || '',
-    waiting_on: t.waiting_on || '',
-    note: t.note || '',
-    contacts: [],
-    pinned: false,
-    project: '',
-  });
-  // Remove from results
-  results.splice(index, 1);
-  toast('Task accepted');
-  // Re-render inbox results
-  const container = document.getElementById('inboxResults');
-  if (container && results.length === 0) {
-    container.innerHTML = '<div style="font-size:12px;color:var(--success);margin-bottom:10px">All tasks accepted.</div>';
+// Quick-add Enter key binding (set up after render)
+function bindImportQuickKey() {
+  const inp = document.getElementById('importQuickInput');
+  if (inp) {
+    inp.onkeydown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.querySelector('[data-action="quickAdd"]')?.click();
+      }
+    };
   }
-};
+}
 
 // ═══════════════════════════════════════════
 // Keyboard Shortcuts
@@ -1558,7 +1759,7 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if (e.key === 'n' || e.key === 'N') { e.preventDefault(); APP.showModal = 'addTask'; render(); }
-  if (e.key === 'i' || e.key === 'I') { e.preventDefault(); APP.showModal = 'inbox'; render(); }
+  if (e.key === 'i' || e.key === 'I') { e.preventDefault(); APP.showModal = 'import'; APP.importMode = 'bulk'; APP.importResults = null; APP.importSummary = ''; APP.importQuickQueue = []; render(); }
   if (e.key === 'e' || e.key === 'E') { e.preventDefault(); APP.showModal = 'endOfDay'; render(); }
   if (e.key === '/') { e.preventDefault(); APP.searchQuery = ''; render(); setTimeout(() => { const el = document.querySelector('[data-action="search"]'); if (el) el.focus(); }, 50); }
   if (e.key === 'Escape') { APP.searchQuery = ''; render(); }

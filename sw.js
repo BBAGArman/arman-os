@@ -1,4 +1,4 @@
-const CACHE_NAME = 'arman-os-v1';
+const CACHE_NAME = 'arman-os-v2';
 const ASSETS = [
   '/arman-os/',
   '/arman-os/index.html',
